@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: gitauth
-Version: 1.0.0
+Version: 1.1.0
 Summary: A CLI tool to rewrite Git commit authors and committers
 Author-email: Mubashar Dev <hello@mubashar.dev>
 License: MIT
@@ -161,6 +161,23 @@ Add `--verbose` to any command for detailed output:
 ```bash
 gitauth rewrite --old-email "old@dev.com" --new-name "New Name" --new-email "new@dev.com" --verbose
 ```
+
+### Branch-Specific Operations
+
+Filter operations by specific branch:
+
+```bash
+# Check authors only on main branch
+gitauth check --branch main
+
+# Preview commits from specific branch
+gitauth dry-run --old-email "old@dev.com" --branch develop
+
+# Interactive selection for a specific branch
+gitauth dry-run --choose-old --branch feature/new-feature
+```
+
+**Note**: The `--branch` option filters which commits are analyzed and displayed. When using the `rewrite` command, git-filter-repo and git-filter-branch rewrite history across all branches by default (this is standard Git behavior for history rewriting tools).
 
 ## ⚠️ Important Warnings
 
