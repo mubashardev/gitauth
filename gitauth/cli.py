@@ -106,6 +106,16 @@ def dry_run(
         "-a",
         help="Show all commits"
     ),
+    map_all: bool = typer.Option(
+        False,
+        "--map-all",
+        help="Alias for --all: show all commits (same as --all)"
+    ),
+    choose_old: bool = typer.Option(
+        False,
+        "--choose-old",
+        help="Interactively select author(s) to filter by"
+    ),
     limit: int = typer.Option(
         50,
         "--limit",
@@ -138,6 +148,85 @@ def dry_run(
             raise typer.Exit(0)
 
         console.print("[bold]Finding commits...[/bold]")
+
+        # support --map-all as an alias for --all
+        if map_all:
+            all_commits = True
+
+        # If user wants to choose an existing author interactively
+        if choose_old:
+            authors = detect_authors(repo)
+            if not authors:
+                console.print("[yellow]No authors found to choose from[/yellow]")
+                raise typer.Exit(0)
+
+            sorted_authors = sorted(authors, key=lambda a: a.name.lower())
+            console.print("\n[bold]Select author(s) to filter by:[/bold]\n")
+            for i, a in enumerate(sorted_authors, start=1):
+                console.print(f"  {i}. {a.name} <{a.email}>")
+
+            choice = typer.prompt("\nEnter author number (or comma-separated numbers)", default="1")
+            try:
+                indices = [int(x.strip()) - 1 for x in choice.split(",")]
+                chosen_authors = [sorted_authors[idx] for idx in indices]
+                
+                # For dry-run, show commits from all selected authors
+                commits = []
+                for author in chosen_authors:
+                    author_commits = find_commits_by_author(
+                        repo, 
+                        email=author.email, 
+                        name=author.name,
+                        limit=limit
+                    )
+                    commits.extend(author_commits)
+                
+                # Remove duplicates and limit
+                seen = set()
+                unique_commits = []
+                for c in commits:
+                    if c['hash'] not in seen:
+                        seen.add(c['hash'])
+                        unique_commits.append(c)
+                
+                commits = unique_commits[:limit]
+                
+                if not commits:
+                    console.print("[yellow]No matching commits found[/yellow]")
+                    raise typer.Exit(0)
+
+                total_count = len(commits)
+                showing = min(total_count, limit)
+
+                console.print(
+                    f"\n[bold green]Found {total_count} commit(s) from selected author(s). Showing first {showing}:[/bold green]\n"
+                )
+
+                # Create table
+                table = Table(show_header=True, header_style="bold cyan")
+                table.add_column("Commit", style="yellow", width=10)
+                table.add_column("Author", style="green")
+                table.add_column("Email", style="blue")
+                table.add_column("Subject", style="white", overflow="fold")
+
+                for commit in commits[:limit]:
+                    table.add_row(
+                        commit['hash'][:8],
+                        commit['author_name'],
+                        commit['author_email'],
+                        commit['subject'][:60] + "..." if len(commit['subject']) > 60 else commit['subject']
+                    )
+
+                console.print(table)
+
+                if total_count > limit:
+                    console.print(f"\n[dim]... and {total_count - limit} more commits[/dim]")
+                
+                raise typer.Exit(0)
+                
+            except (ValueError, IndexError):
+                console.print("[bold red]Invalid selection[/bold red]")
+                raise typer.Exit(1)
 
         if all_commits:
             commits = find_commits_by_author(repo, limit=limit)
@@ -259,17 +348,17 @@ def rewrite(
         "-n",
         help="Old author name to replace"
     ),
-    new_name: str = typer.Option(
-        ...,
+    new_name: Optional[str] = typer.Option(
+        None,
         "--new-name",
         "-N",
-        help="New author name"
+        help="New author name (optional with --choose-old)"
     ),
-    new_email: str = typer.Option(
-        ...,
+    new_email: Optional[str] = typer.Option(
+        None,
         "--new-email",
         "-E",
-        help="New author email"
+        help="New author email (optional with --choose-old)"
     ),
     all_commits: bool = typer.Option(
         False,
@@ -277,10 +366,20 @@ def rewrite(
         "-a",
         help="Rewrite all commits regardless of author"
     ),
+    map_all: bool = typer.Option(
+        False,
+        "--map-all",
+        help="Alias for --all: map all authors to the new identity"
+    ),
     no_backup: bool = typer.Option(
         False,
         "--no-backup",
         help="Skip automatic backup"
+    ),
+    choose_old: bool = typer.Option(
+        False,
+        "--choose-old",
+        help="Interactively select author(s) to rewrite and choose new identity"
     ),
     path: Optional[Path] = typer.Option(
         None,
@@ -315,10 +414,90 @@ def rewrite(
             )
             raise typer.Exit(1)
 
+        # support --map-all alias
+        if map_all:
+            all_commits = True
+
+        # Interactive selection from existing authors
+        if choose_old:
+            authors = detect_authors(repo)
+            if not authors:
+                console.print("[yellow]No authors found to choose from[/yellow]")
+                raise typer.Exit(0)
+
+            sorted_authors = sorted(authors, key=lambda a: a.name.lower())
+            
+            # Step 1: Select old author(s) to rewrite
+            console.print("\n[bold cyan]Step 1: Select author(s) to rewrite[/bold cyan]\n")
+            for i, a in enumerate(sorted_authors, start=1):
+                console.print(f"  {i}. {a.name} <{a.email}>")
+
+            old_choice = typer.prompt("\nEnter author number(s) (comma-separated for multiple)", default="1")
+            try:
+                old_indices = [int(x.strip()) - 1 for x in old_choice.split(",")]
+                chosen_old_authors = [sorted_authors[idx] for idx in old_indices]
+            except (ValueError, IndexError):
+                console.print("[bold red]Invalid selection[/bold red]")
+                raise typer.Exit(1)
+
+            console.print(f"\n[bold green]Selected {len(chosen_old_authors)} author(s) to rewrite:[/bold green]")
+            for a in chosen_old_authors:
+                console.print(f"  - {a.name} <{a.email}>")
+            
+            # Step 2: Choose new identity (from list or enter new)
+            console.print("\n[bold cyan]Step 2: Choose new identity[/bold cyan]")
+            console.print("\nOptions:")
+            console.print("  1. Select from existing authors")
+            console.print("  2. Enter new author details")
+            
+            new_choice = typer.prompt("\nEnter choice (1 or 2)", default="2")
+            
+            if new_choice == "1":
+                # Select from existing authors
+                console.print("\n[bold]Select new author:[/bold]\n")
+                for i, a in enumerate(sorted_authors, start=1):
+                    console.print(f"  {i}. {a.name} <{a.email}>")
+                
+                new_author_choice = typer.prompt("\nEnter author number", default="1")
+                try:
+                    new_idx = int(new_author_choice.strip()) - 1
+                    chosen_new = sorted_authors[new_idx]
+                    new_name = chosen_new.name
+                    new_email = chosen_new.email
+                except (ValueError, IndexError):
+                    console.print("[bold red]Invalid selection[/bold red]")
+                    raise typer.Exit(1)
+            else:
+                # Use provided new_name and new_email from command options
+                # If not provided via CLI args, they'll be required and typer will prompt
+                if not new_name or not new_email:
+                    console.print("\n[bold yellow]Enter new author details:[/bold yellow]")
+                    if not new_name:
+                        new_name = typer.prompt("New author name")
+                    if not new_email:
+                        new_email = typer.prompt("New author email")
+            
+            console.print(f"\n[bold green]New identity:[/bold green] {new_name} <{new_email}>")
+            
+            # For rewrite logic: we need to handle multiple old authors
+            # We'll create a mailmap or run multiple rewrites
+            # For now, let's rewrite each old author to the new one
+            # This will be handled by passing the info to rewrite_history
+            
+            # Store the selections for processing
+            selected_old_authors = chosen_old_authors
+
         # Validate inputs
-        if not all_commits and not old_email and not old_name:
+        if not choose_old and not all_commits and not old_email and not old_name:
             console.print(
-                "[bold red]Error:[/bold red] Must specify --old-email, --old-name, or --all"
+                "[bold red]Error:[/bold red] Must specify --old-email, --old-name, --all, or --choose-old"
+            )
+            raise typer.Exit(1)
+        
+        # Validate new identity (required unless using --choose-old)
+        if not choose_old and (not new_name or not new_email):
+            console.print(
+                "[bold red]Error:[/bold red] --new-name and --new-email are required (unless using --choose-old)"
             )
             raise typer.Exit(1)
 
@@ -326,6 +505,10 @@ def rewrite(
         console.print("\n[bold]Rewrite Configuration:[/bold]")
         if all_commits:
             console.print("  [yellow]Mode:[/yellow] Rewrite ALL commits")
+        elif choose_old and 'selected_old_authors' in locals():
+            console.print(f"  [yellow]Mode:[/yellow] Rewrite {len(selected_old_authors)} selected author(s)")
+            for a in selected_old_authors:
+                console.print(f"    - {a.name} <{a.email}>")
         else:
             if old_email:
                 console.print(f"  [yellow]Old Email:[/yellow] {old_email}")
@@ -336,7 +519,13 @@ def rewrite(
         console.print(f"  [green]New Email:[/green] {new_email}")
 
         # Count affected commits
-        if not all_commits:
+        if choose_old and 'selected_old_authors' in locals():
+            total_count = 0
+            for a in selected_old_authors:
+                count = repo.count_commits_by_author(email=a.email, name=a.name)
+                total_count += count
+            console.print(f"\n[bold yellow]This will affect approximately {total_count} commit(s)[/bold yellow]")
+        elif not all_commits:
             count = repo.count_commits_by_author(email=old_email, name=old_name)
             console.print(f"\n[bold yellow]This will affect approximately {count} commit(s)[/bold yellow]")
 
@@ -361,14 +550,27 @@ def rewrite(
         # Perform rewrite
         console.print("\n[bold]Rewriting history...[/bold]")
 
-        rewrite_history(
-            repo,
-            old_email=old_email,
-            old_name=old_name,
-            new_name=new_name,
-            new_email=new_email,
-            rewrite_all=all_commits
-        )
+        if choose_old and 'selected_old_authors' in locals():
+            # Rewrite multiple authors sequentially
+            for i, old_author in enumerate(selected_old_authors, start=1):
+                console.print(f"\n[dim]Processing author {i}/{len(selected_old_authors)}: {old_author.name} <{old_author.email}>[/dim]")
+                rewrite_history(
+                    repo,
+                    old_email=old_author.email,
+                    old_name=old_author.name,
+                    new_name=new_name,
+                    new_email=new_email,
+                    rewrite_all=False
+                )
+        else:
+            rewrite_history(
+                repo,
+                old_email=old_email,
+                old_name=old_name,
+                new_name=new_name,
+                new_email=new_email,
+                rewrite_all=all_commits
+            )
 
         console.print("\n[bold green]✓ History rewritten successfully![/bold green]")
         console.print(

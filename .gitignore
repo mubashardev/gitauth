@@ -21,9 +21,13 @@ htmlcov/
 .pyre/
 .pytype/
 .ipynb_checkpoints/
-**/__pycache__/
+**/__pycache__/**
 **/*.pyc
 **/*.pyo
 **/*.pyd
 gitauth.egg-info/
 gitauth.egg-info/PKG-INFO
+*/__pycache__/*
+*/*.pyc
+*/*.pyo
+*/*.pyd
