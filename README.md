@@ -129,6 +129,23 @@ Add `--verbose` to any command for detailed output:
 gitauth rewrite --old-email "old@dev.com" --new-name "New Name" --new-email "new@dev.com" --verbose
 ```
 
+### Branch-Specific Operations
+
+Filter operations by specific branch:
+
+```bash
+# Check authors only on main branch
+gitauth check --branch main
+
+# Preview commits from specific branch
+gitauth dry-run --old-email "old@dev.com" --branch develop
+
+# Interactive selection for a specific branch
+gitauth dry-run --choose-old --branch feature/new-feature
+```
+
+**Note**: The `--branch` option filters which commits are analyzed and displayed. When using the `rewrite` command, git-filter-repo and git-filter-branch rewrite history across all branches by default (this is standard Git behavior for history rewriting tools).
+
 ## ⚠️ Important Warnings
 
 ### History Rewriting

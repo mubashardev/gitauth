@@ -41,12 +41,13 @@ class Author:
         return self.__repr__()
 
 
-def detect_authors(repo: GitRepo) -> set[Author]:
+def detect_authors(repo: GitRepo, branch: Optional[str] = None) -> set[Author]:
     """
     Detect all unique authors in the repository.
 
     Args:
         repo: GitRepo instance
+        branch: Optional branch name to limit search
 
     Returns:
         Set of unique Author instances
@@ -54,9 +55,13 @@ def detect_authors(repo: GitRepo) -> set[Author]:
     logger.info("Detecting authors in repository...")
 
     # Get all unique authors
-    result = repo._run_command([
-        "git", "log", "--all", "--format=%an|%ae"
-    ])
+    cmd = ["git", "log", "--format=%an|%ae"]
+    if branch:
+        cmd.append(branch)
+    else:
+        cmd.append("--all")
+    
+    result = repo._run_command(cmd)
 
     authors = set()
     for line in result.stdout.strip().split('\n'):
@@ -103,7 +108,8 @@ def find_commits_by_author(
     repo: GitRepo,
     email: Optional[str] = None,
     name: Optional[str] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    branch: Optional[str] = None
 ) -> list[dict]:
     """
     Find commits by a specific author.
@@ -113,13 +119,19 @@ def find_commits_by_author(
         email: Author email to filter by
         name: Author name to filter by
         limit: Maximum number of commits to return
+        branch: Optional branch name to limit search
 
     Returns:
         List of commit information dictionaries
     """
     logger.info(f"Finding commits by author (email={email}, name={name})...")
 
-    cmd = ["git", "log", "--all", "--format=%H|%an|%ae|%s"]
+    cmd = ["git", "log", "--format=%H|%an|%ae|%s"]
+    
+    if branch:
+        cmd.append(branch)
+    else:
+        cmd.append("--all")
 
     if email:
         cmd.extend(["--author", email])

@@ -43,6 +43,12 @@ def check(
         None,
         help="Path to Git repository (default: current directory)"
     ),
+    branch: Optional[str] = typer.Option(
+        None,
+        "--branch",
+        "-b",
+        help="Specific branch to analyze (default: all branches)"
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -63,7 +69,7 @@ def check(
             raise typer.Exit(0)
 
         console.print("[bold]Detecting authors...[/bold]")
-        authors = detect_authors(repo)
+        authors = detect_authors(repo, branch=branch)
 
         if not authors:
             console.print("[yellow]No authors found[/yellow]")
@@ -128,6 +134,12 @@ def dry_run(
         "-p",
         help="Path to Git repository (default: current directory)"
     ),
+    branch: Optional[str] = typer.Option(
+        None,
+        "--branch",
+        "-b",
+        help="Specific branch to analyze (default: all branches)"
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -155,7 +167,7 @@ def dry_run(
 
         # If user wants to choose an existing author interactively
         if choose_old:
-            authors = detect_authors(repo)
+            authors = detect_authors(repo, branch=branch)
             if not authors:
                 console.print("[yellow]No authors found to choose from[/yellow]")
                 raise typer.Exit(0)
@@ -177,7 +189,8 @@ def dry_run(
                         repo, 
                         email=author.email, 
                         name=author.name,
-                        limit=limit
+                        limit=limit,
+                        branch=branch
                     )
                     commits.extend(author_commits)
                 
@@ -229,7 +242,7 @@ def dry_run(
                 raise typer.Exit(1)
 
         if all_commits:
-            commits = find_commits_by_author(repo, limit=limit)
+            commits = find_commits_by_author(repo, limit=limit, branch=branch)
         else:
             if not old_email and not old_name:
                 console.print(
@@ -241,7 +254,8 @@ def dry_run(
                 repo,
                 email=old_email,
                 name=old_name,
-                limit=limit
+                limit=limit,
+                branch=branch
             )
 
         if not commits:
@@ -387,6 +401,12 @@ def rewrite(
         "-p",
         help="Path to Git repository (default: current directory)"
     ),
+    branch: Optional[str] = typer.Option(
+        None,
+        "--branch",
+        "-b",
+        help="Specific branch to rewrite (default: current branch)"
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -420,7 +440,7 @@ def rewrite(
 
         # Interactive selection from existing authors
         if choose_old:
-            authors = detect_authors(repo)
+            authors = detect_authors(repo, branch=branch)
             if not authors:
                 console.print("[yellow]No authors found to choose from[/yellow]")
                 raise typer.Exit(0)
