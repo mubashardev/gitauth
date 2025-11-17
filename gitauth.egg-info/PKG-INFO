@@ -1,3 +1,36 @@
+Metadata-Version: 2.4
+Name: gitauth
+Version: 1.0.0
+Summary: A CLI tool to rewrite Git commit authors and committers
+Author-email: GitAuth Contributors <contributors@gitauth.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/yourusername/gitauth
+Project-URL: Documentation, https://github.com/yourusername/gitauth#readme
+Project-URL: Repository, https://github.com/yourusername/gitauth
+Project-URL: Issues, https://github.com/yourusername/gitauth/issues
+Keywords: git,author,rewrite,commit,cli,filter-repo,filter-branch
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development :: Version Control :: Git
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: typer[all]>=0.9.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Dynamic: license-file
+
 # GitAuth
 
 A powerful, production-grade CLI tool to safely rewrite Git commit authors and committers across your repository history.
@@ -24,7 +57,7 @@ pip install gitauth
 ### From Source
 
 ```bash
-git clone https://github.com/mubashardev/gitauth.git
+git clone https://github.com/yourusername/gitauth.git
 cd gitauth
 pip install -e .
 ```
@@ -302,9 +335,9 @@ Contributions are welcome! Please:
 
 ## Support
 
-- 🐛 [Report bugs](https://github.com/mubashardev/gitauth/issues)
-- 💡 [Request features](https://github.com/mubashardev/gitauth/issues)
-- 📖 [Read documentation](https://github.com/mubashardev/gitauth#readme)
+- 🐛 [Report bugs](https://github.com/yourusername/gitauth/issues)
+- 💡 [Request features](https://github.com/yourusername/gitauth/issues)
+- 📖 [Read documentation](https://github.com/yourusername/gitauth#readme)
 
 ## Acknowledgments
 
@@ -314,4 +347,4 @@ Contributions are welcome! Please:
 
 ---
 
-**Made with ❤️ by [Mubashar Dev](https://mubashar.dev)**
+**Made with ❤️ by the GitAuth community**

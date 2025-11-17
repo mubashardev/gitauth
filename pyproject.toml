@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "GitAuth Contributors", email = "contributors@gitauth.dev"}
+    {name = "Mubashar Dev", email = "hello@mubashar.dev"}
 ]
 keywords = ["git", "author", "rewrite", "commit", "cli", "filter-repo", "filter-branch"]
 classifiers = [
@@ -40,10 +40,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/gitauth"
-Documentation = "https://github.com/yourusername/gitauth#readme"
-Repository = "https://github.com/yourusername/gitauth"
-Issues = "https://github.com/yourusername/gitauth/issues"
+Homepage = "https://github.com/mubashardev/gitauth"
+Documentation = "https://github.com/mubashardev/gitauth#readme"
+Repository = "https://github.com/mubashardev/gitauth"
+Issues = "https://github.com/mubashardev/gitauth/issues"
 
 [project.scripts]
 gitauth = "gitauth.cli:app"
