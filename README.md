@@ -1,0 +1,317 @@
+# GitAuth
+
+A powerful, production-grade CLI tool to safely rewrite Git commit authors and committers across your repository history.
+
+## Features
+
+- 🔄 **Flexible Rewriting**: Change specific authors or rewrite all commits
+- 🔍 **Author Detection**: Identify all unique authors in your repository
+- 🧪 **Dry Run Mode**: Preview changes before applying them
+- 💾 **Automatic Backups**: Create repository backups before rewriting
+- ⚡ **Two Backends**: Uses `git filter-repo` (preferred) with `git filter-branch` fallback
+- 🛡️ **Safety First**: Validates repo state and provides clear warnings
+- 📝 **Preserves History**: Keeps commit messages, timestamps, and commit order intact
+- 🌍 **Cross-Platform**: Works on macOS, Linux, and Windows
+
+## Installation
+
+### From PyPI
+
+```bash
+pip install gitauth
+```
+
+### From Source
+
+```bash
+git clone https://github.com/yourusername/gitauth.git
+cd gitauth
+pip install -e .
+```
+
+### Optional: Install git-filter-repo
+
+For best performance, install `git-filter-repo`:
+
+```bash
+# macOS
+brew install git-filter-repo
+
+# Linux (Debian/Ubuntu)
+sudo apt-get install git-filter-repo
+
+# Or via pip
+pip install git-filter-repo
+```
+
+If not installed, `gitauth` will automatically fall back to `git filter-branch`.
+
+## Usage
+
+### Check Repository Authors
+
+List all unique authors in your repository:
+
+```bash
+gitauth check
+```
+
+Output:
+```
+Found 3 unique authors:
+  John Doe <john@example.com>
+  Jane Smith <jane@example.com>
+  Old Name <old@dev.com>
+```
+
+### Dry Run (Preview Changes)
+
+See which commits would be changed without modifying anything:
+
+```bash
+# Preview changes for a specific email
+gitauth dry-run --old-email "old@dev.com"
+
+# Preview changes for a specific name
+gitauth dry-run --old-name "Old Name"
+```
+
+### Rewrite Specific Author
+
+Change commits from a specific author:
+
+```bash
+# By email
+gitauth rewrite --old-email "old@dev.com" --new-name "New Name" --new-email "new@dev.com"
+
+# By name
+gitauth rewrite --old-name "Old Name" --new-name "New Name" --new-email "new@dev.com"
+
+# Both (more specific)
+gitauth rewrite --old-email "old@dev.com" --old-name "Old Name" --new-name "New Name" --new-email "new@dev.com"
+```
+
+### Rewrite All Commits
+
+Change all commits to a new author:
+
+```bash
+gitauth rewrite --all --new-name "New Name" --new-email "new@dev.com"
+```
+
+### Create Backup
+
+Manually create a backup of your repository:
+
+```bash
+gitauth backup
+```
+
+Creates: `backup-YYYYMMDD-HHMMSS.tar.gz`
+
+### Push Changes
+
+After rewriting, push to remote (use with caution!):
+
+```bash
+# Interactive confirmation
+gitauth push
+
+# Force push without confirmation
+gitauth push --force
+```
+
+### Enable Verbose Logging
+
+Add `--verbose` to any command for detailed output:
+
+```bash
+gitauth rewrite --old-email "old@dev.com" --new-name "New Name" --new-email "new@dev.com" --verbose
+```
+
+## ⚠️ Important Warnings
+
+### History Rewriting
+
+**Rewriting Git history is a destructive operation.** Before using this tool:
+
+1. ✅ **Always create a backup** (or work on a clone)
+2. ✅ **Coordinate with your team** if working on a shared repository
+3. ✅ **Understand the implications** of force-pushing
+4. ✅ **Test on a branch first** before affecting main/master
+
+### Force Pushing
+
+After rewriting history, you'll need to force push:
+
+```bash
+git push --force-with-lease origin main
+# or use: gitauth push --force
+```
+
+**Warning**: This will rewrite history on the remote. All collaborators must re-clone or reset their local repositories.
+
+## Examples
+
+### Example 1: Fix Personal Email
+
+You accidentally committed with your work email and want to change it to personal:
+
+```bash
+# 1. Check current authors
+gitauth check
+
+# 2. Preview changes
+gitauth dry-run --old-email "work@company.com"
+
+# 3. Rewrite commits
+gitauth rewrite --old-email "work@company.com" --new-name "Your Name" --new-email "personal@gmail.com"
+
+# 4. Push changes
+gitauth push
+```
+
+### Example 2: Unify Multiple Identities
+
+You committed with different names/emails and want to unify them:
+
+```bash
+# Fix first identity
+gitauth rewrite --old-email "old1@example.com" --new-name "Your Name" --new-email "unified@example.com"
+
+# Fix second identity
+gitauth rewrite --old-email "old2@example.com" --new-name "Your Name" --new-email "unified@example.com"
+
+# Push once
+gitauth push
+```
+
+### Example 3: Transfer Repository Ownership
+
+Change all commits to a new author (e.g., transferring project ownership):
+
+```bash
+# Preview all commits
+gitauth dry-run --all
+
+# Rewrite all
+gitauth rewrite --all --new-name "New Owner" --new-email "newowner@example.com"
+
+# Push
+gitauth push
+```
+
+## How It Works
+
+1. **Detection**: Scans repository using `git log` to find commits matching criteria
+2. **Validation**: Checks if repository is clean and valid
+3. **Backup**: Optionally creates a compressed backup
+4. **Rewriting**: Uses `git filter-repo` (fast) or `git filter-branch` (fallback)
+5. **Preservation**: Maintains commit timestamps, messages, and tree structure
+6. **Safety**: Provides dry-run mode and interactive confirmations
+
+## Project Structure
+
+```
+gitauth/
+├── gitauth/
+│   ├── __init__.py
+│   ├── cli.py              # Typer CLI interface
+│   └── core/
+│       ├── __init__.py
+│       ├── git_utils.py    # Git operations and validation
+│       ├── detect.py       # Author detection
+│       ├── backup.py       # Backup functionality
+│       └── rewrite.py      # Rewrite logic (filter-repo/filter-branch)
+├── tests/
+│   ├── __init__.py
+│   ├── test_git_utils.py
+│   ├── test_detect.py
+│   ├── test_backup.py
+│   └── test_rewrite.py
+├── pyproject.toml
+├── README.md
+└── LICENSE
+```
+
+## Development
+
+### Setup Development Environment
+
+```bash
+git clone https://github.com/yourusername/gitauth.git
+cd gitauth
+pip install -e ".[dev]"
+```
+
+### Run Tests
+
+```bash
+pytest
+pytest --cov=gitauth tests/
+```
+
+### Format Code
+
+```bash
+black gitauth tests
+ruff check gitauth tests
+```
+
+### Build Package
+
+```bash
+python -m build
+```
+
+### Publish to PyPI
+
+```bash
+python -m twine upload dist/*
+```
+
+## Requirements
+
+- Python 3.8+
+- Git 2.0+
+- `git-filter-repo` (optional, recommended)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
+
+## Changelog
+
+### Version 1.0.0
+- Initial release
+- Support for `git filter-repo` and `git filter-branch`
+- Dry run mode
+- Automatic backups
+- Author detection
+- Cross-platform support
+
+## Support
+
+- 🐛 [Report bugs](https://github.com/yourusername/gitauth/issues)
+- 💡 [Request features](https://github.com/yourusername/gitauth/issues)
+- 📖 [Read documentation](https://github.com/yourusername/gitauth#readme)
+
+## Acknowledgments
+
+- Inspired by GitHub's [author-rewrite script](https://docs.github.com/en/github/using-git/changing-author-info)
+- Powered by [git-filter-repo](https://github.com/newren/git-filter-repo)
+- Built with [Typer](https://typer.tiangolo.com/)
+
+---
+
+**Made with ❤️ by the GitAuth community**
