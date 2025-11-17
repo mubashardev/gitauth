@@ -2,12 +2,12 @@ Metadata-Version: 2.4
 Name: gitauth
 Version: 1.0.0
 Summary: A CLI tool to rewrite Git commit authors and committers
-Author-email: GitAuth Contributors <contributors@gitauth.dev>
+Author-email: Mubashar Dev <hello@mubashar.dev>
 License: MIT
-Project-URL: Homepage, https://github.com/yourusername/gitauth
-Project-URL: Documentation, https://github.com/yourusername/gitauth#readme
-Project-URL: Repository, https://github.com/yourusername/gitauth
-Project-URL: Issues, https://github.com/yourusername/gitauth/issues
+Project-URL: Homepage, https://github.com/mubashardev/gitauth
+Project-URL: Documentation, https://github.com/mubashardev/gitauth#readme
+Project-URL: Repository, https://github.com/mubashardev/gitauth
+Project-URL: Issues, https://github.com/mubashardev/gitauth/issues
 Keywords: git,author,rewrite,commit,cli,filter-repo,filter-branch
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
@@ -57,7 +57,7 @@ pip install gitauth
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/gitauth.git
+git clone https://github.com/mubashardev/gitauth.git
 cd gitauth
 pip install -e .
 ```
@@ -335,9 +335,9 @@ Contributions are welcome! Please:
 
 ## Support
 
-- 🐛 [Report bugs](https://github.com/yourusername/gitauth/issues)
-- 💡 [Request features](https://github.com/yourusername/gitauth/issues)
-- 📖 [Read documentation](https://github.com/yourusername/gitauth#readme)
+- 🐛 [Report bugs](https://github.com/mubashardev/gitauth/issues)
+- 💡 [Request features](https://github.com/mubashardev/gitauth/issues)
+- 📖 [Read documentation](https://github.com/mubashardev/gitauth#readme)
 
 ## Acknowledgments
 
@@ -347,4 +347,4 @@ Contributions are welcome! Please:
 
 ---
 
-**Made with ❤️ by the GitAuth community**
+**Made with ❤️ by [Mubashar Dev](https://mubashar.dev)**
