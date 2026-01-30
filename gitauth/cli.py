@@ -799,6 +799,28 @@ def arrange(
         import json
         import tempfile
 
+        # Backup Remotes
+        # git-filter-repo deletes remotes; we need to restore them.
+        remotes = {}
+        try:
+            remote_lines = (
+                repo._run_command(["git", "remote", "-v"], check=False).stdout.strip().splitlines()
+            )
+            for line in remote_lines:
+                if not line:
+                    continue
+                parts = line.split()
+                if len(parts) >= 2:
+                    name, url = parts[0], parts[1]
+                    # Only Store fetch or push? Usually they are same or pairs.
+                    # We can just store one URL per name (last one overwrites, usually fine as push url is what matters? or we add both?)
+                    # simpler: just `git remote add name url` works for single url.
+                    remotes[name] = url
+        except Exception:
+            console.print(
+                "[yellow]Warning: Could not backup remotes. You may need to re-add them.[/yellow]"
+            )
+
         # Create a temp file with the mapping
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(schedule, f)
@@ -817,9 +839,6 @@ except Exception:
 commit_hash = commit.original_id.decode('utf-8')
 if commit_hash in schedule:
     new_date_iso = schedule[commit_hash]
-    # filter-repo expects bytes for dates? Or specific format?
-    # actually commit.author_date is a byte string like b"1234567890 +0000"
-    # We need to convert ISO to that format.
     
     dt = datetime.datetime.fromisoformat(new_date_iso)
     timestamp = int(dt.timestamp())
@@ -835,10 +854,6 @@ if commit_hash in schedule:
 
         cmd = ["git", "filter-repo", "--force", "--commit-callback", callback_script]
 
-        # filter-repo runs on the repo in CWD usually, or we use --source/--target
-        # gitauth typically runs inside the repo or with -C
-        # GitRepo._run_command uses cwd=self.path
-
         result = repo._run_command(cmd, check=False)
 
         # Cleanup temp file
@@ -848,6 +863,14 @@ if commit_hash in schedule:
             os.unlink(schedule_path)
         except:
             pass
+
+        # Restore Remotes
+        if remotes:
+            console.print("[dim]Restoring remotes...[/dim]")
+            for name, url in remotes.items():
+                # check if exists first? filter-repo should have deleted them.
+                # git remote add name url
+                repo._run_command(["git", "remote", "add", name, url], check=False)
 
         if result.returncode != 0:
             console.print(f"[bold red]Error rewriting history: {result.stderr}[/bold red]")
