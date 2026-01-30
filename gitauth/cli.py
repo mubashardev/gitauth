@@ -13,12 +13,15 @@ from .core.backup import create_backup
 from .core.detect import detect_authors, find_commits_by_author
 from .core.git_utils import GitError, GitRepo
 from .core.rewrite import rewrite_history, RewriteError
+from .core.arrange import calculate_schedule
+import datetime
+import dateutil.parser
 
 # Create Typer app
 app = typer.Typer(
     name="gitauth",
     help="A CLI tool to rewrite Git commit authors and committers",
-    add_completion=False
+    add_completion=False,
 )
 
 # Rich console for pretty output
@@ -31,30 +34,18 @@ logger = logging.getLogger(__name__)
 def setup_logging(verbose: bool = False):
     """Configure logging based on verbosity."""
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='%(levelname)s: %(message)s'
-    )
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
 
 @app.command()
 def check(
     path: Optional[Path] = typer.Argument(
-        None,
-        help="Path to Git repository (default: current directory)"
+        None, help="Path to Git repository (default: current directory)"
     ),
     branch: Optional[str] = typer.Option(
-        None,
-        "--branch",
-        "-b",
-        help="Specific branch to analyze (default: all branches)"
+        None, "--branch", "-b", help="Specific branch to analyze (default: all branches)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """
     List all unique authors in the repository.
@@ -95,57 +86,26 @@ def check(
 @app.command()
 def dry_run(
     old_email: Optional[str] = typer.Option(
-        None,
-        "--old-email",
-        "-e",
-        help="Old author email to search for"
+        None, "--old-email", "-e", help="Old author email to search for"
     ),
     old_name: Optional[str] = typer.Option(
-        None,
-        "--old-name",
-        "-n",
-        help="Old author name to search for"
+        None, "--old-name", "-n", help="Old author name to search for"
     ),
-    all_commits: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="Show all commits"
-    ),
+    all_commits: bool = typer.Option(False, "--all", "-a", help="Show all commits"),
     map_all: bool = typer.Option(
-        False,
-        "--map-all",
-        help="Alias for --all: show all commits (same as --all)"
+        False, "--map-all", help="Alias for --all: show all commits (same as --all)"
     ),
     choose_old: bool = typer.Option(
-        False,
-        "--choose-old",
-        help="Interactively select author(s) to filter by"
+        False, "--choose-old", help="Interactively select author(s) to filter by"
     ),
-    limit: int = typer.Option(
-        50,
-        "--limit",
-        "-l",
-        help="Maximum number of commits to show"
-    ),
+    limit: int = typer.Option(50, "--limit", "-l", help="Maximum number of commits to show"),
     path: Optional[Path] = typer.Option(
-        None,
-        "--path",
-        "-p",
-        help="Path to Git repository (default: current directory)"
+        None, "--path", "-p", help="Path to Git repository (default: current directory)"
     ),
     branch: Optional[str] = typer.Option(
-        None,
-        "--branch",
-        "-b",
-        help="Specific branch to analyze (default: all branches)"
+        None, "--branch", "-b", help="Specific branch to analyze (default: all branches)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """
     Preview which commits would be changed (dry run).
@@ -181,29 +141,25 @@ def dry_run(
             try:
                 indices = [int(x.strip()) - 1 for x in choice.split(",")]
                 chosen_authors = [sorted_authors[idx] for idx in indices]
-                
+
                 # For dry-run, show commits from all selected authors
                 commits = []
                 for author in chosen_authors:
                     author_commits = find_commits_by_author(
-                        repo, 
-                        email=author.email, 
-                        name=author.name,
-                        limit=limit,
-                        branch=branch
+                        repo, email=author.email, name=author.name, limit=limit, branch=branch
                     )
                     commits.extend(author_commits)
-                
+
                 # Remove duplicates and limit
                 seen = set()
                 unique_commits = []
                 for c in commits:
-                    if c['hash'] not in seen:
-                        seen.add(c['hash'])
+                    if c["hash"] not in seen:
+                        seen.add(c["hash"])
                         unique_commits.append(c)
-                
+
                 commits = unique_commits[:limit]
-                
+
                 if not commits:
                     console.print("[yellow]No matching commits found[/yellow]")
                     raise typer.Exit(0)
@@ -224,19 +180,23 @@ def dry_run(
 
                 for commit in commits[:limit]:
                     table.add_row(
-                        commit['hash'][:8],
-                        commit['author_name'],
-                        commit['author_email'],
-                        commit['subject'][:60] + "..." if len(commit['subject']) > 60 else commit['subject']
+                        commit["hash"][:8],
+                        commit["author_name"],
+                        commit["author_email"],
+                        (
+                            commit["subject"][:60] + "..."
+                            if len(commit["subject"]) > 60
+                            else commit["subject"]
+                        ),
                     )
 
                 console.print(table)
 
                 if total_count > limit:
                     console.print(f"\n[dim]... and {total_count - limit} more commits[/dim]")
-                
+
                 raise typer.Exit(0)
-                
+
             except (ValueError, IndexError):
                 console.print("[bold red]Invalid selection[/bold red]")
                 raise typer.Exit(1)
@@ -251,11 +211,7 @@ def dry_run(
                 raise typer.Exit(1)
 
             commits = find_commits_by_author(
-                repo,
-                email=old_email,
-                name=old_name,
-                limit=limit,
-                branch=branch
+                repo, email=old_email, name=old_name, limit=limit, branch=branch
             )
 
         if not commits:
@@ -278,10 +234,14 @@ def dry_run(
 
         for commit in commits[:limit]:
             table.add_row(
-                commit['hash'][:8],
-                commit['author_name'],
-                commit['author_email'],
-                commit['subject'][:60] + "..." if len(commit['subject']) > 60 else commit['subject']
+                commit["hash"][:8],
+                commit["author_name"],
+                commit["author_email"],
+                (
+                    commit["subject"][:60] + "..."
+                    if len(commit["subject"]) > 60
+                    else commit["subject"]
+                ),
             )
 
         console.print(table)
@@ -297,29 +257,13 @@ def dry_run(
 @app.command()
 def backup(
     output_dir: Optional[Path] = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Output directory for backup (default: parent directory)"
+        None, "--output", "-o", help="Output directory for backup (default: parent directory)"
     ),
-    format: str = typer.Option(
-        "tar.gz",
-        "--format",
-        "-f",
-        help="Backup format: 'zip' or 'tar.gz'"
-    ),
+    format: str = typer.Option("tar.gz", "--format", "-f", help="Backup format: 'zip' or 'tar.gz'"),
     path: Optional[Path] = typer.Option(
-        None,
-        "--path",
-        "-p",
-        help="Path to Git repository (default: current directory)"
+        None, "--path", "-p", help="Path to Git repository (default: current directory)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """
     Create a backup of the Git repository.
@@ -351,68 +295,36 @@ def backup(
 @app.command()
 def rewrite(
     old_email: Optional[str] = typer.Option(
-        None,
-        "--old-email",
-        "-e",
-        help="Old author email to replace"
+        None, "--old-email", "-e", help="Old author email to replace"
     ),
     old_name: Optional[str] = typer.Option(
-        None,
-        "--old-name",
-        "-n",
-        help="Old author name to replace"
+        None, "--old-name", "-n", help="Old author name to replace"
     ),
     new_name: Optional[str] = typer.Option(
-        None,
-        "--new-name",
-        "-N",
-        help="New author name (optional with --choose-old)"
+        None, "--new-name", "-N", help="New author name (optional with --choose-old)"
     ),
     new_email: Optional[str] = typer.Option(
-        None,
-        "--new-email",
-        "-E",
-        help="New author email (optional with --choose-old)"
+        None, "--new-email", "-E", help="New author email (optional with --choose-old)"
     ),
     all_commits: bool = typer.Option(
-        False,
-        "--all",
-        "-a",
-        help="Rewrite all commits regardless of author"
+        False, "--all", "-a", help="Rewrite all commits regardless of author"
     ),
     map_all: bool = typer.Option(
-        False,
-        "--map-all",
-        help="Alias for --all: map all authors to the new identity"
+        False, "--map-all", help="Alias for --all: map all authors to the new identity"
     ),
-    no_backup: bool = typer.Option(
-        False,
-        "--no-backup",
-        help="Skip automatic backup"
-    ),
+    no_backup: bool = typer.Option(False, "--no-backup", help="Skip automatic backup"),
     choose_old: bool = typer.Option(
         False,
         "--choose-old",
-        help="Interactively select author(s) to rewrite and choose new identity"
+        help="Interactively select author(s) to rewrite and choose new identity",
     ),
     path: Optional[Path] = typer.Option(
-        None,
-        "--path",
-        "-p",
-        help="Path to Git repository (default: current directory)"
+        None, "--path", "-p", help="Path to Git repository (default: current directory)"
     ),
     branch: Optional[str] = typer.Option(
-        None,
-        "--branch",
-        "-b",
-        help="Specific branch to rewrite (default: current branch)"
+        None, "--branch", "-b", help="Specific branch to rewrite (default: current branch)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """
     Rewrite Git commit authors and committers.
@@ -446,13 +358,15 @@ def rewrite(
                 raise typer.Exit(0)
 
             sorted_authors = sorted(authors, key=lambda a: a.name.lower())
-            
+
             # Step 1: Select old author(s) to rewrite
             console.print("\n[bold cyan]Step 1: Select author(s) to rewrite[/bold cyan]\n")
             for i, a in enumerate(sorted_authors, start=1):
                 console.print(f"  {i}. {a.name} <{a.email}>")
 
-            old_choice = typer.prompt("\nEnter author number(s) (comma-separated for multiple)", default="1")
+            old_choice = typer.prompt(
+                "\nEnter author number(s) (comma-separated for multiple)", default="1"
+            )
             try:
                 old_indices = [int(x.strip()) - 1 for x in old_choice.split(",")]
                 chosen_old_authors = [sorted_authors[idx] for idx in old_indices]
@@ -460,24 +374,26 @@ def rewrite(
                 console.print("[bold red]Invalid selection[/bold red]")
                 raise typer.Exit(1)
 
-            console.print(f"\n[bold green]Selected {len(chosen_old_authors)} author(s) to rewrite:[/bold green]")
+            console.print(
+                f"\n[bold green]Selected {len(chosen_old_authors)} author(s) to rewrite:[/bold green]"
+            )
             for a in chosen_old_authors:
                 console.print(f"  - {a.name} <{a.email}>")
-            
+
             # Step 2: Choose new identity (from list or enter new)
             console.print("\n[bold cyan]Step 2: Choose new identity[/bold cyan]")
             console.print("\nOptions:")
             console.print("  1. Select from existing authors")
             console.print("  2. Enter new author details")
-            
+
             new_choice = typer.prompt("\nEnter choice (1 or 2)", default="2")
-            
+
             if new_choice == "1":
                 # Select from existing authors
                 console.print("\n[bold]Select new author:[/bold]\n")
                 for i, a in enumerate(sorted_authors, start=1):
                     console.print(f"  {i}. {a.name} <{a.email}>")
-                
+
                 new_author_choice = typer.prompt("\nEnter author number", default="1")
                 try:
                     new_idx = int(new_author_choice.strip()) - 1
@@ -496,14 +412,14 @@ def rewrite(
                         new_name = typer.prompt("New author name")
                     if not new_email:
                         new_email = typer.prompt("New author email")
-            
+
             console.print(f"\n[bold green]New identity:[/bold green] {new_name} <{new_email}>")
-            
+
             # For rewrite logic: we need to handle multiple old authors
             # We'll create a mailmap or run multiple rewrites
             # For now, let's rewrite each old author to the new one
             # This will be handled by passing the info to rewrite_history
-            
+
             # Store the selections for processing
             selected_old_authors = chosen_old_authors
 
@@ -513,7 +429,7 @@ def rewrite(
                 "[bold red]Error:[/bold red] Must specify --old-email, --old-name, --all, or --choose-old"
             )
             raise typer.Exit(1)
-        
+
         # Validate new identity (required unless using --choose-old)
         if not choose_old and (not new_name or not new_email):
             console.print(
@@ -525,8 +441,10 @@ def rewrite(
         console.print("\n[bold]Rewrite Configuration:[/bold]")
         if all_commits:
             console.print("  [yellow]Mode:[/yellow] Rewrite ALL commits")
-        elif choose_old and 'selected_old_authors' in locals():
-            console.print(f"  [yellow]Mode:[/yellow] Rewrite {len(selected_old_authors)} selected author(s)")
+        elif choose_old and "selected_old_authors" in locals():
+            console.print(
+                f"  [yellow]Mode:[/yellow] Rewrite {len(selected_old_authors)} selected author(s)"
+            )
             for a in selected_old_authors:
                 console.print(f"    - {a.name} <{a.email}>")
         else:
@@ -539,15 +457,19 @@ def rewrite(
         console.print(f"  [green]New Email:[/green] {new_email}")
 
         # Count affected commits
-        if choose_old and 'selected_old_authors' in locals():
+        if choose_old and "selected_old_authors" in locals():
             total_count = 0
             for a in selected_old_authors:
                 count = repo.count_commits_by_author(email=a.email, name=a.name)
                 total_count += count
-            console.print(f"\n[bold yellow]This will affect approximately {total_count} commit(s)[/bold yellow]")
+            console.print(
+                f"\n[bold yellow]This will affect approximately {total_count} commit(s)[/bold yellow]"
+            )
         elif not all_commits:
             count = repo.count_commits_by_author(email=old_email, name=old_name)
-            console.print(f"\n[bold yellow]This will affect approximately {count} commit(s)[/bold yellow]")
+            console.print(
+                f"\n[bold yellow]This will affect approximately {count} commit(s)[/bold yellow]"
+            )
 
         # Warning
         console.print(
@@ -570,17 +492,19 @@ def rewrite(
         # Perform rewrite
         console.print("\n[bold]Rewriting history...[/bold]")
 
-        if choose_old and 'selected_old_authors' in locals():
+        if choose_old and "selected_old_authors" in locals():
             # Rewrite multiple authors sequentially
             for i, old_author in enumerate(selected_old_authors, start=1):
-                console.print(f"\n[dim]Processing author {i}/{len(selected_old_authors)}: {old_author.name} <{old_author.email}>[/dim]")
+                console.print(
+                    f"\n[dim]Processing author {i}/{len(selected_old_authors)}: {old_author.name} <{old_author.email}>[/dim]"
+                )
                 rewrite_history(
                     repo,
                     old_email=old_author.email,
                     old_name=old_author.name,
                     new_name=new_name,
                     new_email=new_email,
-                    rewrite_all=False
+                    rewrite_all=False,
                 )
         else:
             rewrite_history(
@@ -589,7 +513,7 @@ def rewrite(
                 old_name=old_name,
                 new_name=new_name,
                 new_email=new_email,
-                rewrite_all=all_commits
+                rewrite_all=all_commits,
             )
 
         console.print("\n[bold green]✓ History rewritten successfully![/bold green]")
@@ -610,36 +534,19 @@ def rewrite(
         console.print(f"\n[bold red]Unexpected error:[/bold red] {e}")
         if verbose:
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(1)
 
 
 @app.command()
 def push(
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Force push without confirmation"
-    ),
-    remote: str = typer.Option(
-        "origin",
-        "--remote",
-        "-r",
-        help="Remote name"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Force push without confirmation"),
+    remote: str = typer.Option("origin", "--remote", "-r", help="Remote name"),
     path: Optional[Path] = typer.Option(
-        None,
-        "--path",
-        "-p",
-        help="Path to Git repository (default: current directory)"
+        None, "--path", "-p", help="Path to Git repository (default: current directory)"
     ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Enable verbose output"
-    )
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """
     Push rewritten history to remote repository.
@@ -679,8 +586,7 @@ def push(
         console.print("\n[bold]Pushing to remote...[/bold]")
 
         result = repo._run_command(
-            ["git", "push", "--force-with-lease", remote, current_branch],
-            check=False
+            ["git", "push", "--force-with-lease", remote, current_branch], check=False
         )
 
         if result.returncode != 0:
@@ -698,6 +604,268 @@ def push(
 
     except GitError as e:
         console.print(f"\n[bold red]Error:[/bold red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def arrange(
+    start_commit: Optional[str] = typer.Option(
+        None, "--start-commit", "-s", help="Starting commit hash (oldest)"
+    ),
+    end_commit: Optional[str] = typer.Option(
+        None, "--end-commit", "-e", help="Ending commit hash (newest)"
+    ),
+    commits: Optional[str] = typer.Option(
+        None,
+        "--commits",
+        "-c",
+        help="Range of commits (e.g. 'HEAD~10..HEAD' or '50' for last 50). Overrides start/end.",
+    ),
+    start_date: Optional[str] = typer.Option(None, "--start-date", help="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = typer.Option(None, "--end-date", help="End date (YYYY-MM-DD)"),
+    start_time: Optional[str] = typer.Option(None, "--start-time", help="Daily start time (HH:MM)"),
+    end_time: Optional[str] = typer.Option(None, "--end-time", help="Daily end time (HH:MM)"),
+    timezone: Optional[str] = typer.Option(None, "--timezone", help="Timezone (e.g. 'UTC')"),
+    skip_weekends: Optional[bool] = typer.Option(
+        None, "--skip-weekends/--no-skip-weekends", help="Skip weekends"
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Force execution without confirmation"),
+    path: Optional[Path] = typer.Option(
+        None, "--path", "-p", help="Path to Git repository (default: current directory)"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+):
+    """
+    Arrange commit dates over a specified timeline.
+    """
+    setup_logging(verbose)
+
+    try:
+        repo = GitRepo(str(path) if path else None)
+
+        if not repo.has_commits():
+            console.print("[yellow]Repository has no commits yet[/yellow]")
+            raise typer.Exit(0)
+
+        # Determine Commit Range
+        git_range = None
+
+        # If --commits is provided, use it (shortcut)
+        if commits:
+            if commits.isdigit():
+                git_range = f"HEAD~{commits}..HEAD"
+            else:
+                git_range = commits
+        else:
+            # Interactive / Explict Start & End
+            if not start_commit:
+                console.print("\n[bold]Select Commit Range:[/bold]")
+                start_commit = typer.prompt(
+                    "Enter STARTING commit hash (oldest)", default="HEAD~10"
+                )
+
+            if not end_commit:
+                end_commit = typer.prompt("Enter ENDING commit hash (newest)", default="HEAD")
+
+            # Validation
+            console.print("[dim]Validating commits...[/dim]")
+
+            # 1. Verify existence
+            for name, rev in [("Start", start_commit), ("End", end_commit)]:
+                res = repo._run_command(["git", "rev-parse", "--verify", rev], check=False)
+                if res.returncode != 0:
+                    console.print(f"[bold red]Error:[/bold red] {name} commit '{rev}' not found.")
+                    raise typer.Exit(1)
+                # Update to full hash
+                if name == "Start":
+                    start_commit = res.stdout.strip()
+                if name == "End":
+                    end_commit = res.stdout.strip()
+
+            # 2. Verify ancestry (start must be ancestor of end)
+            res = repo._run_command(
+                ["git", "merge-base", "--is-ancestor", start_commit, end_commit], check=False
+            )
+            if res.returncode != 0:
+                console.print(
+                    f"[bold red]Error:[/bold red] Start commit must be an ancestor of end commit."
+                )
+                raise typer.Exit(1)
+
+            # Construct range
+            # We want to INCLUDE start_commit.
+            # git log start..end excludes start.
+            # So we use start^..end, but if start is root, this fails.
+            # Safe way: git log --ancestry-path start..end + explicit start?
+            # Or check if start has parent.
+
+            has_parent = (
+                repo._run_command(["git", "rev-parse", f"{start_commit}^"], check=False).returncode
+                == 0
+            )
+            if has_parent:
+                git_range = f"{start_commit}^..{end_commit}"
+            else:
+                git_range = end_commit  # All commits up to end (root included)
+
+        # Interactive Time/Date setup
+        if not start_date:
+            default_start = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
+            start_date = typer.prompt("Enter start date (YYYY-MM-DD)", default=default_start)
+
+        if not end_date:
+            default_end = datetime.date.today().isoformat()
+            end_date = typer.prompt("Enter end date (YYYY-MM-DD)", default=default_end)
+
+        if not start_time:
+            start_time = typer.prompt("Start time for potential commits (HH:MM)", default="09:00")
+
+        if not end_time:
+            end_time = typer.prompt("End time for potential commits (HH:MM)", default="17:00")
+
+        if not timezone:
+            import time
+
+            # Default to empty string to indicate "Local" to the backend
+            # We can show a hint in the prompt
+            timezone = typer.prompt("Enter timezone (leave empty for Local)", default="")
+
+        if skip_weekends is None:
+            skip_weekends = typer.confirm("Do you want to skip weekends?", default=True)
+
+        # Process Inputs
+        try:
+            s_date = dateutil.parser.parse(start_date).date()
+            e_date = dateutil.parser.parse(end_date).date()
+        except Exception:
+            console.print("[bold red]Invalid date format[/bold red]")
+            raise typer.Exit(1)
+
+        # Fetch commits
+        console.print("[bold]Fetching commits...[/bold]")
+
+        # Get list of commits in the range
+        cmd = ["git", "log", "--format=%H", git_range]
+        result = repo._run_command(cmd, check=False)
+        if result.returncode != 0:
+            console.print(f"[bold red]Error listing commits: {result.stderr}[/bold red]")
+            raise typer.Exit(1)
+
+        commit_hashes = result.stdout.strip().splitlines()
+
+        # If using start_commit (manual range), verify start_commit is in the list
+        # If we used start^..end, it should be.
+        # If start was root, we used 'end', which includes root.
+
+        if not commit_hashes:
+            console.print("[yellow]No commits found in range[/yellow]")
+            raise typer.Exit(0)
+
+        commit_objects = [{"hash": h} for h in commit_hashes]
+
+        # Calculate Schedule
+        console.print("[bold]Calculating new schedule...[/bold]")
+        schedule = calculate_schedule(
+            repo, commit_objects, s_date, e_date, start_time, end_time, timezone, skip_weekends
+        )
+
+        console.print(f"[bold green]Scheduled {len(schedule)} commits.[/bold green]")
+
+        # Preview
+        console.print("\n[bold]Preview (first 5):[/bold]")
+        preview_count = 0
+        for h, date_str in schedule.items():
+            if preview_count < 5:
+                console.print(f"  {h[:8]} -> {date_str}")
+                preview_count += 1
+
+        if not force:
+            if not typer.confirm("\nDo you want to apply these changes?"):
+                console.print("[yellow]Aborted[/yellow]")
+                raise typer.Exit(0)
+
+        # Apply changes
+        # check if filter-repo is available
+        if not repo.has_filter_repo():
+            console.print("[bold red]git-filter-repo is required for this command.[/bold red]")
+            console.print("Please install it: pip install git-filter-repo")
+            raise typer.Exit(1)
+
+        # We need to construct a robust way to pass this map to filter-repo.
+        # It supports --commit-callback "..."
+        # We can inline the schedule map into the callback script?
+        # Or write a callback python script to a temp file.
+
+        import json
+        import tempfile
+
+        # Create a temp file with the mapping
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(schedule, f)
+            schedule_path = f.name
+
+        # Create the callback script
+        callback_script = f"""
+import json
+import datetime
+try:
+    with open(r'{schedule_path}', 'r') as f:
+        schedule = json.load(f)
+except Exception:
+    schedule = {{}}
+
+commit_hash = commit.original_id.decode('utf-8')
+if commit_hash in schedule:
+    new_date_iso = schedule[commit_hash]
+    # filter-repo expects bytes for dates? Or specific format?
+    # actually commit.author_date is a byte string like b"1234567890 +0000"
+    # We need to convert ISO to that format.
+    
+    dt = datetime.datetime.fromisoformat(new_date_iso)
+    timestamp = int(dt.timestamp())
+    offset = dt.strftime('%z')
+    date_bytes = f"{{timestamp}} {{offset}}".encode('ascii')
+    
+    commit.author_date = date_bytes
+    commit.committer_date = date_bytes
+"""
+        # Run filter-repo
+        # git filter-repo --commit-callback "..." --force
+        console.print("\n[bold]Rewriting history...[/bold]")
+
+        cmd = ["git", "filter-repo", "--force", "--commit-callback", callback_script]
+
+        # filter-repo runs on the repo in CWD usually, or we use --source/--target
+        # gitauth typically runs inside the repo or with -C
+        # GitRepo._run_command uses cwd=self.path
+
+        result = repo._run_command(cmd, check=False)
+
+        # Cleanup temp file
+        import os
+
+        try:
+            os.unlink(schedule_path)
+        except:
+            pass
+
+        if result.returncode != 0:
+            console.print(f"[bold red]Error rewriting history: {result.stderr}[/bold red]")
+            raise typer.Exit(1)
+
+        console.print("\n[bold green]✓ History rewritten successfully![/bold green]")
+        console.print(
+            "\n[bold]Next steps:[/bold]\n"
+            "  1. Verify the changes: [cyan]git log[/cyan]\n"
+            "  2. Force push to remote: [cyan]gitauth push[/cyan]\n"
+        )
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        if verbose:
+            import traceback
+
+            console.print(traceback.format_exc())
         raise typer.Exit(1)
 
 

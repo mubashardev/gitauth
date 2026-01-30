@@ -12,6 +12,7 @@ gitauth.egg-info/entry_points.txt
 gitauth.egg-info/requires.txt
 gitauth.egg-info/top_level.txt
 gitauth/core/__init__.py
+gitauth/core/arrange.py
 gitauth/core/backup.py
 gitauth/core/detect.py
 gitauth/core/git_utils.py
